@@ -1,0 +1,50 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net5.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Security\CustomAccountClaimsPrincipalFactory.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Remove="Shared\ClaimsDisplay.razor" />
+    <Content Remove="Shared\DefaultStore.razor" />
+    <Content Remove="Shared\DeleteCutoverConfirmation.razor" />
+    <Content Remove="Shared\DeleteUserConfirmation.razor" />
+    <Content Remove="Shared\ErrorHandler.razor" />
+    <Content Remove="Shared\LegendSelector.razor" />
+    <Content Remove="Shared\LoginDisplay.razor" />
+    <Content Remove="Shared\MainLayout.razor" />
+    <Content Remove="Shared\MerchHeirarchySelector.razor" />
+    <Content Remove="Shared\NavMenu.razor" />
+    <Content Remove="Shared\Pagination.razor" />
+    <Content Remove="Shared\PlanTable.razor" />
+    <Content Remove="Shared\ProductCatHeirarchySelector.razor" />
+    <Content Remove="Shared\RedirectToLogin.razor" />
+    <Content Remove="Shared\SurveyPrompt.razor" />
+    <Content Remove="Shared\Version.razor" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Shared\MainLayout.razor.css" />
+    <None Remove="Shared\NavMenu.razor.css" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="5.0.17" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Client\BlazorApp3.Client.csproj" />
+    <ProjectReference Include="..\Shared\BlazorApp3.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Security\" />
+    <Folder Include="Shared\" />
+  </ItemGroup>
+
+
+</Project>

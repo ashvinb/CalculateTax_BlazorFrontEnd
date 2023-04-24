@@ -1,0 +1,34 @@
+﻿@inject ICutoverService cutoverService
+
+<div class="container-fluid">
+    <div class="col">
+        <p class="delete-this-use">DELETE THIS LOCATION?</p>
+        <hr />
+        <br />
+    </div>
+    <div class="col">
+        <button class="action-button" @onclick="Cancel">CANCEL</button>
+        <button class="action-delete-button" @onclick="Delete">DELETE</button>
+    </div>
+    <br />
+    <br />
+</div>
+
+@code {
+    [CascadingParameter]
+    BlazoredModalInstance ModalInstance { get; set; }
+
+    [Parameter]
+    public int Location { get; set; }
+
+    void Delete()
+    {
+        ModalInstance.CloseAsync(ModalResult.Ok<bool>(true));
+    }
+
+    void Cancel()
+    {
+        ModalInstance.CancelAsync();
+    }
+
+}

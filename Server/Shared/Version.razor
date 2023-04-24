@@ -1,0 +1,21 @@
+﻿@using System.Reflection
+
+<span class="version-tag">@("v" + AppVersion)</span>
+
+@code {
+
+    private string AppVersion
+    {
+        get
+        {
+            try
+            {
+                return Assembly.GetExecutingAssembly().GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>().InformationalVersion;
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+    }
+}

@@ -1,0 +1,335 @@
+﻿@using Woolworths.FoodISO.Services
+@using Woolworths.FoodISO.Services.Models
+@using Woolworths.FoodISO.WebClient.Infrastructure
+
+@inject IMasterDataService masterDataService
+@inject IProductService productService
+
+<table class="merch-selector">
+    <tbody>
+        <tr>
+            <td>
+                <label>Store</label>
+            </td>
+            <td>
+                @if (stores is null)
+                {
+                    <p><em>Loading stores...</em></p>
+                }
+                else
+                {
+                    <select value="@selectedStoreId" @onchange="SelectedStoreChanged">
+                        @foreach (var store in stores)
+                        {
+                            <option value="@store.Id">@store.Id - @store.Name</option>
+                        }
+                    </select>
+                }
+            </td>
+        </tr>
+        @if (showDepartments)
+        {
+            <tr>
+                <td>
+                    <label>Department</label>
+                </td>
+                <td>
+                    @if (departments is null)
+                    {
+                        <p><em>Loading departments...</em></p>
+                    }
+                    else
+                    {
+                        @if (departments.Count > 0)
+                        {
+                            <select value="@selectedDepartmentId" @onchange="SelectedDepartmentChanged">
+                                @foreach (var dept in departments)
+                                {
+                                    <option value="@dept.Id">@dept.Id - @dept.Name</option>
+                                }
+                            </select>
+                        }
+                        else
+                        {
+                            <p><em>No departments available for selected store.</em></p>
+                        }
+                    }
+                </td>
+            </tr>
+        }
+        @if(showProductGroups)
+        {
+            <tr>
+                <td>
+                    <label>Product Group</label>
+                </td>
+                <td>
+                    @if (SelectedDepartmentId == 0)
+                    {
+                        @if (departments?.Count == 0)
+                        {
+                            <p><em>No product groups available for selected store.</em></p>
+                        }
+                        else
+                        {
+                            <p><em>Loading product groups...</em></p>
+                        }
+                    }
+                    else
+                    {
+                        <select value="@selectedProductGroupId" @onchange="SelectedProductGroupSelectionChanged">
+                            <option value="0">All Product Groups</option>
+
+                            @foreach (var subclass in departments.Where(d => d.Id == SelectedDepartmentId).First().Subclasses)
+                            {
+                                <option value="@subclass.Id">@subclass.ProductGroupId - @subclass.Name</option>
+                            }
+                        </select>
+                    }
+                </td>
+            </tr>
+            @if (departments?.Count > 0)
+            {
+                @if (IsMasterPlan)
+                {
+                    <tr>
+                        <td>
+                            <label>Status Week</label>
+                        </td>
+                        <td>
+                            <select value="@currentStatusWeek" @onchange="CurrentStatusWeekSelectionChanged">
+                                @foreach (var week in statusWeeks)
+                                {
+                                    <option value="@week">@week - @(week == 1 ? "Normal Week" : "")</option>
+                                }
+                            </select>
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    <tr>
+                        <td>
+                            <label>Estimate Week</label>
+                        </td>
+                        <td>
+                            @foreach (var week in estimateWeeks)
+                            {
+                                <label class="estimate-week">
+                                    <input name="estimateWeek" type="radio" value="@week" checked="@(currentEstimateWeek == week)" @onchange="@(async () => { currentEstimateWeek = week; await RaiseOnHierarchySelectionChanged(); })" />
+                                    @week.ToString()
+                                </label>
+                            }
+                        </td>
+                    </tr>
+                }
+            }
+        }
+    </tbody>
+    <tfoot>
+        @if (showOpenButton)
+        {
+            <tr>
+                <td>
+                    <button id="btnOpen" @onclick="btnOpen_Click">Open</button>
+                </td>
+            </tr>
+        }
+    </tfoot>
+</table>
+
+@code {
+
+    List<Location> stores;
+    List<Department> departments;
+
+    int currentStatusWeek = 1;
+    int currentEstimateWeek = 1;
+
+    int[] statusWeeks = new int[] { 1, 2, 3, 4, 5 };
+    int[] estimateWeeks = new int[] { 1, 2 };
+
+    bool isLoading = true;
+    bool showDepartments = false;
+    bool showProductGroups = false;
+    bool showOpenButton = true;
+
+    private string selectedStoreId;
+    public int SelectedStoreId
+    {
+        get { return Convert.ToInt32(selectedStoreId); }
+        private set
+        {
+            selectedStoreId = value.ToString();
+        }
+    }
+
+    private int selectedDepartmentId;
+    public int SelectedDepartmentId
+    {
+        get { return selectedDepartmentId; }
+        private set { selectedDepartmentId = value; }
+    }
+
+    private string selectedProductGroupId;
+    public int SelectedProductGroupId
+    {
+        get { return Convert.ToInt32(selectedProductGroupId); }
+        private set { selectedProductGroupId = value.ToString(); }
+    }
+
+    public int SelectedWeek
+    {
+        get
+        {
+            if (IsMasterPlan)
+                return currentStatusWeek;
+            else
+                return currentEstimateWeek;
+        }
+    }
+
+    [Parameter]
+    public bool IsMasterPlan { get; set; } = false;
+
+    [Parameter]
+    public EventCallback<OnHierarchySelectionChangedEventArgs> OnHierarchySelectionChanged { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; }
+
+    [CascadingParameter]
+    private ErrorHandler ErrorHandler { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Grab the current user and check for the default store
+            var user = (await authenticationStateTask).User;
+
+            var defaultStore = Convert.ToInt32(user.Claims.Where(c => c.Type == Constants.CustomClaimNames.DefaultStore).Select(c => c.Value).SingleOrDefault());
+            var viewAll = Convert.ToBoolean(user.Claims.Where(c => c.Type == Constants.CustomClaimNames.ViewAll).Select(c => c.Value).SingleOrDefault());
+
+            if (user.IsInRole(Constants.Roles.Admin) || viewAll)
+            {
+                // Load all stores
+                stores = await productService.GetLocations();
+            }
+            else
+            {
+                // User should only have access to the stores linked to their account.
+                string alternateStores = user.Claims.Where(c => c.Type == Constants.CustomClaimNames.AlternateStores).Select(c => c.Value).SingleOrDefault();
+
+                List<int> allowedStoreIds = new List<int> { defaultStore };
+
+                if (!string.IsNullOrEmpty(alternateStores))
+                    allowedStoreIds.AddRange(alternateStores.Split(',').Select(s => Convert.ToInt32(s)).ToList());
+
+                stores = await productService.GetLocations(allowedStoreIds);
+            }
+
+            // Set the selected store to the default.
+            selectedStoreId = defaultStore.ToString();
+
+            // Load departments
+            departments = await productService.GetLocationProductHierarchy(Convert.ToInt32(selectedStoreId));
+
+            if (departments?.Count != 0)
+                await SelectedDepartmentChanged(new ChangeEventArgs { Value = departments.First().Id });
+
+            await base.OnInitializedAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorHandler.HandleException(ex);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    public async Task SelectedStoreChanged(ChangeEventArgs e)
+    {
+        departments = null;
+        SelectedDepartmentId = 0;
+        SelectedStoreId = Convert.ToInt32(e.Value);
+
+        try
+        {
+            departments = await productService.GetLocationProductHierarchy(Convert.ToInt32(selectedStoreId));
+
+            if (departments?.Count == 0)
+                return;
+
+            await SelectedDepartmentChanged(new ChangeEventArgs { Value = departments.First().Id });
+        }
+        catch (Exception ex)
+        {
+            ErrorHandler.HandleException(ex);
+        }
+    }
+
+    public async Task SelectedDepartmentChanged(ChangeEventArgs e)
+    {
+        SelectedDepartmentId = Convert.ToInt32(e.Value);
+        await SelectedProductGroupSelectionChanged(new ChangeEventArgs { Value = 0 });
+    }
+
+    public async Task SelectedProductGroupSelectionChanged(ChangeEventArgs e)
+    {
+        SelectedProductGroupId = Convert.ToInt32(e.Value);
+        await RaiseOnHierarchySelectionChanged();
+    }
+
+    public async Task CurrentStatusWeekSelectionChanged(ChangeEventArgs e)
+    {
+        currentStatusWeek = Convert.ToInt32(e.Value);
+
+        await RaiseOnHierarchySelectionChanged();
+    }
+
+    private async Task RaiseOnHierarchySelectionChanged()
+    {
+        if (!showOpenButton)
+        {
+            await OnHierarchySelectionChanged.InvokeAsync(new OnHierarchySelectionChangedEventArgs
+            {
+                LocationId = Convert.ToInt32(selectedStoreId),
+                DepartmentId = selectedDepartmentId,
+                SubclassId = Convert.ToInt32(selectedProductGroupId),
+                WeekNo = SelectedWeek
+            });
+        }
+        else
+            await btnOpen_Click();
+    }
+
+    // Exists purely to mimic existing functionality.
+    private async Task btnOpen_Click()
+    {
+        if (isLoading)
+            return;
+
+        if (!showDepartments)
+        {
+            showDepartments = true;
+            return;
+        }
+
+        if (!showProductGroups)
+        {
+            showProductGroups = true;
+            return;
+        }
+
+        if (showOpenButton)
+        {
+            showOpenButton = false;
+            await RaiseOnHierarchySelectionChanged();
+            return;
+        }
+    }
+
+}

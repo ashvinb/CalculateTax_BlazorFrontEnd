@@ -1,0 +1,79 @@
+﻿@page "/taxcalculator"
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-2">
+            <label for="dropdown0">Postcode</label>
+        </div>
+        <div class="col-md-4">
+            <select id="dropdown0" @oninput="UpdatePostcode">
+                <option value="">Select a postcode</option>
+                <option value="7441">7441</option>
+                <option value="1000">1000</option>
+                <option value="A100">A100</option>
+                <option value="7000">7000</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-2">
+            <label for="dropdown1">Income</label>
+        </div>
+        <div class="col-md-4">
+            <input @bind="Income" type="text" />
+           
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-2">
+            <label for="dropdown2"></label>
+        </div>
+        <div class="col-md-4">
+            <button @onclick="CalculateTax">Calculate Tax</button>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-2">
+            <label for="dropdown3">Tax Amount</label>
+        </div>
+        <div class="col-md-4">
+           <input @bind="TaxAmount" type="text" readonly />
+        </div>
+    </div>
+
+</div>
+
+
+@code {
+
+    private string TaxAmount { get; set; } = "";
+    private string Income { get; set; } = "";
+    private string PostCodeValue;
+    
+    
+    private async void CalculateTax()
+    {
+        var response = await Http.GetStringAsync($"http://localhost:5122/TaxCalculation?annualIncome={Income}&postcode={PostCodeValue}");
+        TaxAmount = response;    
+        StateHasChanged();
+    }
+
+    private void UpdatePostcode(ChangeEventArgs e)
+    {
+        PostCodeValue = e.Value.ToString();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+
+    }
+    
+}
+
+
+

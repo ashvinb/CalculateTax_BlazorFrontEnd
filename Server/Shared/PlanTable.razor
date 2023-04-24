@@ -1,0 +1,813 @@
+﻿@using Woolworths.FoodISO.Services
+@using Woolworths.FoodISO.Services.Models
+@using System.Globalization;
+@inject IProductService productService
+
+@inject IJSRuntime JSRuntime
+
+@if (isLoading)
+{
+    <div class="spinner-border"></div>
+    <span style="display: inline-block; vertical-align: super">Please wait...</span>
+}
+else
+{
+
+    @if (PlanGroups != null && PlanGroups.Count > 0)
+    {
+        @if (PlanGroups.Count == 0)
+        {
+            <hr />
+            <p class="table-message">
+                @($"No records available for store {locationId} and department {departmentId} and plan week {weekNo}")
+            </p>
+            <hr />
+        }
+        else
+        {
+            <hr />
+            <p class="table-message">
+                Cost Price reflected(excl.VAT & Commission) will not be the preferred cost price charged as per the financial statement
+            </p>
+            <hr />
+
+            @if (ViewType == UserViewType.WeeklySmall)
+            {
+                <table class="plan-table table table-sm table-bordered">
+                    <thead class="plan-header-table">
+                        <tr>
+                            <th>Prod</th>
+                            <th>Prod</th>
+                            <th colspan="3">Prod Desc</th>
+                            <th>ShelfLife</th>
+                            <th colspan="3">Unit per Case</th>
+                            <th>Total</th>
+                            @foreach (var day in weeksdays)
+                            {
+                                <th>@day</th>
+                            }
+                        </tr>
+                        <tr>
+                            <th>Code</th>
+                            <th>SKU</th>
+                            <th colspan="3"></th>
+                            <th colspan="4"></th>
+                            <th>Unit /<br />Cases</th>
+                            @foreach (var WeeklyDates in PlanGroups.First().Products.First().DailyOrderQuantities.OrderBy(x => x.Date))
+                            {
+                                DateTime dates = Convert.ToDateTime(WeeklyDates.Date);
+                                <th>@dates.ToString("dd MMM")</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var productGroup in PlanGroups.OrderBy(pg => pg.Id))
+                        {
+                            @foreach (var product in productGroup.Products.OrderBy(p => p.Code))
+                            {
+                                <tr class="plan-table-rows">
+                                    <td>@product.Code</td>
+                                    <td>@product.Id</td>
+                                    <td colspan="3">@product.Description</td>
+                                    <td>@product.ShelfLife</td>
+                                    <td colspan="3">@product.UnitsPerCase</td>
+                                    <td>@product.TotalCases</td>
+                                    @{
+                                        WeekCounterClear();
+                                    }
+                                    @foreach (var quantity in @product.DailyOrderQuantities)
+                                    {
+                                        daycount++;
+                                        //string elementid = product.Id + daycount.ToString();
+                                        string elementid = product.Id + WeekCounter().ToString();
+                                        @if (quantity.DeliveryDay.Value == false)
+                                        {
+                                            <td>
+                                                <input type="text" id=@elementid readonly class="non-delivery-day" @bind="@quantity.Cases" size="4" onfocus="this.select()" />
+                                            </td>
+                                        }
+                                        else if (quantity.leadTime.Value == false)
+                                        {
+                                            <td>
+                                                <input type="text" id=@elementid readonly class="leadtime-elapsed" @bind="@quantity.Cases" size="4"  onfocus="this.select()"/>
+                                            </td>
+                                        }
+                                        else
+                                        {
+                                            <td>
+                                                <input type="text"
+                                                       id=@elementid
+                                                       size="4"
+                                                       @bind="@quantity.Cases"
+                                                       @bind:event="oninput"
+                                                       @onchange="(ChangeEventArgs eventArgs) => CheckChanged(elementid,eventArgs)" 
+                                                       onfocus="this.select()"/>
+                                                      
+                                            </td>
+                                        }
+                                    }
+                                </tr>
+
+                            }
+                        }
+                    </tbody>
+                    <tfoot>
+                        @if (subclassId != 0)
+                        {
+                            <!-- Add weird summary row -->
+                            <tr class="table-footer">
+                                <td />
+                                <td>0</td>
+                                <td>0</td>
+                                <td>0</td>
+                                <td>R0</td>
+                                <td />
+                                <td>R0</td>
+                                <td>R0</td>
+                                <td>
+                                    R
+                                    <input type="text" readonly value="@GroupTotalCasesBySellingPrice.ToString("N2")" size="5" />
+                                </td>
+                                <td>
+                                    <input type="text" readonly value="@($"{PercentageCasesOfTotal}%")" size="4" />
+                                </td>
+                                <td>
+                                    R
+                                    <input type="text" readonly value="@TotalCasesBySellingPrice.ToString("N2")" size="5" />
+                                </td>
+                                <td colspan="6" />
+                            </tr>
+                        }
+                    </tfoot>
+                </table>
+            }
+            else
+            {
+                <table class="plan-table table table-sm table-bordered">
+                    <thead class="plan-header-table">
+                        <tr>
+                            <th class="first-column">Prod</th>
+                            <th colspan="3">Waste %</th>
+                            <th colspan="3">Unit Sales/Usage</th>
+                            @if (ViewType == UserViewType.Weekly)
+                            {
+                                <th colspan="2">Total</th>
+                            }
+                            else
+                            {
+                                <th>Total</th>
+                            }
+                            @foreach (var day in weeksdays)
+                            {
+                                <th width="100px">@day</th>
+                            }
+                            @if (ViewType == UserViewType.Weekly)
+                            {
+                                <th width="100px">Total</th>
+                            }
+                        </tr>
+                        <tr>
+                            <th class="first-column">
+                                Code
+                                <!-- Hidden placeholder for counting rows in the table. Prevents the styling from changing on table re-bind. -->
+                                <label hidden>@(itemCount = 0)</label>
+                            </th>
+                            @foreach (var wasteTitle in PlanGroups.First().Products.First().WastePercentages.OrderBy(t => t.Key))
+                            {
+                                <th>@wasteTitle.Key.ToString("dd MMM")</th>
+                            }
+                            @foreach (var unitsSalesTitle in PlanGroups.First().Products.First().UnitSalesUsage.OrderBy(t => t.Key))
+                            {
+                                <th>@unitsSalesTitle.Key.ToString("dd MMM")</th>
+                            }
+                            <th>Units / <br />Cases</th>
+                            @if (ViewType == UserViewType.Weekly)
+                            {
+                                <th>RSP</th>
+                            }
+                            @if (ViewType == UserViewType.Weekly)
+                            {
+                                @foreach (var WeeklyDates in PlanGroups.First().Products.First().DailyOrderQuantities.OrderBy(x => x.Date))
+                                {
+                                    DateTime dates = Convert.ToDateTime(WeeklyDates.Date);
+                                    <th>@dates.ToString("dd MMM")</th>
+                                }
+                            }
+                            else
+                            {
+                                @foreach (var day in weeksdays)
+                                {
+                                    <th></th>
+                                }
+                            }
+                            @if (ViewType == UserViewType.Weekly)
+                            {
+                                <th></th>
+                            }
+                        </tr>
+                    </thead>
+                    @foreach (var productGroup in PlanGroups.OrderBy(pg => pg.Id))
+                    {
+                        @foreach (var product in productGroup.Products.OrderBy(p => p.Code))
+                        {
+                            <!-- Product -->
+                            <thead/>
+                            <tbody class="@(itemCount++ % 2 == 0 ? "plan-table-even" : "plan-table-odd")">
+                                <tr class="@product.StyleClass">
+                                    <td>@product.Code</td>
+                                    @foreach (KeyValuePair<DateTime, double> pair in product.WastePercentages)
+                                    {
+                                        <td>@pair.Value.ToString("N1")%</td>
+                                    }
+                                    @foreach (KeyValuePair<DateTime, int> pair in product.UnitSalesUsage)
+                                    {
+                                        <td>@pair.Value</td>
+                                    }
+                                    <td>
+                                        @product.TotalUnits
+                                    </td>
+                                    @if (ViewType == UserViewType.Weekly)
+                                    {
+                                        <td>@product.RSP</td>
+                                    }
+                                    @foreach (var quantity in @product.DailyOrderQuantities)
+                                    {
+                                        <td>
+                                            @(quantity.Cases * product.UnitsPerCase)
+                                        </td>
+                                    }
+                                    @if (ViewType == UserViewType.Weekly)
+                                    {
+                                        <td>@product.TotalUnits</td>
+                                    }
+                                </tr>
+                                <tr class="@product.StyleClass">
+                                    <td>@product.Id</td>
+                                    <td colspan="3">@product.Description</td>
+                                    <td colspan="3" />
+                                    <td>@product.TotalCases</td>
+                                    @if (ViewType == UserViewType.Weekly)
+                                    {
+                                        <td></td>
+                                    }
+                                    @{
+                                        WeekCounterClear();
+                                    }
+                                    @foreach (var quantity in @product.DailyOrderQuantities)
+                                    {
+                                        daycount++;
+                                       //string elementid = product.Id + daycount.ToString();
+                                        string elementid = product.Id + WeekCounter().ToString();
+                                        @if (!product.Available || quantity.DeliveryDay.Value == false)
+                                        {
+                                            <td>
+                                                <input type="text" id=@elementid readonly class="non-delivery-day" @bind="@quantity.Cases" size="4"  onfocus="this.select()"/>
+                                            </td>
+                                        }
+                                        else if (quantity.leadTime.Value == false)
+                                        {
+                                            <td>
+                                                <input type="text" id=@elementid readonly class="leadtime-elapsed" @bind="@quantity.Cases" size="4"  onfocus="this.select()" />
+                                            </td>
+                                        }
+                                        else
+                                        {
+                                           
+                                            <td>
+                                                <input type="text"
+                                                       id=@elementid
+                                                       @bind="@quantity.Cases"
+                                                       @bind:event="oninput"
+                                                       @onchange="(ChangeEventArgs eventArgs) => CheckChanged(elementid,eventArgs)"  
+                                                       size="4"                                                       
+                                                       onfocus="this.select()"/>
+                                            </td>
+                                        }
+                                    }
+                                    @if (ViewType == UserViewType.Weekly)
+                                    {
+                                        <td>@product.TotalCases</td>
+                                    }
+                                </tr>
+                                <tr class="@product.StyleClass">
+                                    <td>Unit/Case: @product.UnitsPerCase</td>
+                                    <td>CP: @product.CostPrice</td>
+                                    <td colspan="2">SP: @product.SellingPrice</td>
+                                    <td colspan="2">Shelf Life: @product.ShelfLife</td>
+                                    <td colspan="@((ViewType == UserViewType.Weekly ? 3 : 2))">Last week sales:</td>
+                                    @foreach (var quantity in @product.DailyOrderQuantities)
+                                    {
+                                        <td>
+                                            @quantity.LastWeekSales
+                                        </td>
+                                    }
+                                    @if (ViewType == UserViewType.Weekly)
+                                    {
+                                        <td>@product.TotalLastWeekSales</td>
+                                    }
+                                </tr>
+                            </tbody>
+                            <!-- Order Totals -->
+                            @if (ViewType == UserViewType.Weekly)
+                            {
+                                <tr style="font-weight:bold;">
+                                    <td colspan="9"></td>
+
+                                    @for (int i = 0; i < product.DailyOrderQuantities.Count; i++)
+                                    {
+                                        <td>@product.DailyOrderTotal(i)</td>
+                                    }
+                                    <td>@product.TotalOrderCost</td>
+                                </tr>
+                            }
+                        }
+                        <!-- Group Totals -->
+                        @if (ViewType == UserViewType.Weekly)
+                        {
+                            <tr style="font-weight:bold;">
+                                <td colspan="9" style="font-weight: bold">@productGroup.Name</td>
+                                @for (int i = 0; i < 7; i++)
+                                {
+                                    <td>
+                                        @productGroup.DailyOrderTotal(i)
+                                    </td>
+                                }
+                                <td>@productGroup.TotalOrderCost</td>
+                            </tr>
+                        }
+                    }
+                    <tfoot>
+                        @if (subclassId != 0)
+                        {
+                            <!-- Add weird summary row -->
+                            <tr class="table-footer">
+                                <td />
+                                <td>0</td>
+                                <td>0</td>
+                                <td>0</td>
+                                <td>0%</td>
+                                <td>0%</td>
+                                <td>0%</td>
+                                <td>
+                                    R
+                                    <input type="text" readonly value="@GroupTotalCasesBySellingPrice.ToString("N2")" size="5" />
+                                </td>
+                                <td />
+                                <td>
+                                    <input type="text" readonly value="@($"{PercentageCasesOfTotal}%")" size="4" />
+                                </td>
+                                <td>
+                                    R
+                                    <input type="text" readonly value="@TotalCasesBySellingPrice.ToString("N2")" size="5" />
+                                </td>
+                                <td colspan="6" />
+                            </tr>
+                        }
+
+                        @if (ViewType == UserViewType.Weekly && subclassId == 0)
+                        {
+                            <!-- Add the department totals row-->
+                            <tr class="dept-footer">
+                                <td colspan="9">Department Total:</td>
+                                @for (int i = 0; i < 7; i++)
+                                {
+                                    <td>
+                                        @GetDepartmentDailyTotal(i)
+                                    </td>
+                                }
+                                <td>@GrandTotal</td>
+                            </tr>
+                        }
+                    </tfoot>
+                </table>
+            }
+        }
+        <hr />
+        <button @onclick="SubmitChanges">Transmit Changes</button>
+        <button @onclick="Reset">Reset</button>
+    }
+}
+@if (showModal)
+{
+    <div class="modal fade show" id="myModal" style="display:block" aria-modal="true" role="dialog">
+        <div class="modal-dialog">
+            <div class="modal-content">
+
+                <!-- Modal Header -->
+                <div class="modal-header">
+                    <h4 class="modal-title">Confirm action</h4>
+                    <button type="button" class="close" @onclick="@ModalCancel">&times;</button>
+                </div>
+
+                <!-- Modal body -->
+                <div class="modal-body">
+                    <p>@content</p>
+                </div>
+
+                <!-- Modal footer -->
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-success" @onclick="@ModalConfirm">Confirm</button>
+                    <button type="button" class="btn btn-danger" @onclick=@ModalCancel>Delete</button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+}
+@if (showSecondModal)
+{
+     <div class="modal fade show" id="mysecondModal" style="display:block" aria-modal="true" role="dialog">
+        <div class="modal-dialog">
+            <div class="modal-content">
+
+                <!-- Modal Header -->
+                <div class="modal-header">
+                    <h4 class="modal-title">Reconfirm action</h4>              
+                </div>
+
+                <!-- Modal body -->
+                <div class="modal-body">
+                    <p>@content</p>
+                </div>
+
+                <!-- Modal footer -->
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-success" @onclick="@ModalConfirm">Yes</button>
+                    <button type="button" class="btn btn-danger" @onclick=@ModalCancel>Delete</button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+}
+@code {
+    bool isLoading = false;
+    bool altRow = false;
+    int daycount = 0;
+    int weekCounter = 0;
+    int itemCount = 0;
+    string[] weeksdays = new string[] { "Mon", "Tues", "Wed", "Thurs", "Fri", "Sat", "Sun" };
+
+    // Holds the parameters for the currently loaded data.
+    int locationId;
+    int departmentId;
+    int subclassId;
+    int weekNo;
+
+    decimal grouptotal = 0.0M;
+
+    public enum UserViewType
+    {
+        Master,
+        Weekly,
+        WeeklySmall
+    }
+
+    private decimal GrandTotal
+    {
+        get
+        {
+            if (PlanGroups is null)
+                return 0;
+
+            decimal total = 0.0M;
+
+            foreach (var group in PlanGroups)
+                total += group.TotalOrderCost;
+
+            return total;
+        }
+    }
+
+    private decimal TotalCasesBySellingPrice
+    {
+        get
+        {
+            decimal? total = 0.0M;
+
+            foreach (var group in AllPlanGroups)
+            {
+                foreach (var product in group.Products.OrderBy(p => p.Code))
+                    total += (product.TotalCases * product.SellingPrice);
+            }
+
+            return total.Value;
+        }
+    }
+
+    private decimal GroupTotalCasesBySellingPrice
+    {
+        get
+        {
+            decimal? total = 0.0M;
+            foreach (var group in PlanGroups)
+            {
+                foreach (var product in group.Products.OrderBy(p => p.Code))
+                    total += (product.TotalCases * product.SellingPrice);
+            }
+
+            return total.Value;
+        }
+    }
+
+    private int PercentageCasesOfTotal
+    {
+        get
+        {
+            if (TotalCasesBySellingPrice == 0)
+                return 0;
+
+            return (int)(Math.Ceiling((GroupTotalCasesBySellingPrice / TotalCasesBySellingPrice) * 100));
+        }
+    }
+
+    [Parameter]
+    public UserViewType ViewType { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; }
+
+    [CascadingParameter]
+    private ErrorHandler ErrorHandler { get; set; }
+
+    private List<ProductGroup> PlanGroups { get; set; }
+
+    private List<ProductGroup> AllPlanGroups { get; set; }
+
+    public async Task LoadPlan(int locationId, int departmentId, int? subclassId, int weekNo)
+    {
+        isLoading = true;
+
+        // Set the plan params so we can access them later when saving or reloading.
+        this.locationId = locationId;
+        this.departmentId = departmentId;
+        this.subclassId = subclassId.HasValue ? subclassId.Value : 0;
+        this.weekNo = weekNo;
+
+        try
+        {
+            if (ViewType == UserViewType.Master)
+                AllPlanGroups = await productService.GetMasterPlan(locationId, departmentId, 0, weekNo);
+            else
+                AllPlanGroups = await productService.GetWeeklyPlan(locationId, departmentId, 0, weekNo);
+
+            if (subclassId.HasValue && subclassId != 0)
+                PlanGroups = AllPlanGroups.Where(g => g.Id == subclassId).ToList();
+            else
+            {
+                PlanGroups = AllPlanGroups;
+
+                await GetPlan();//for holding default values as binding makes it hard to get the previous default values
+            }
+
+
+            if (PlanGroups is null)
+                PlanGroups = new List<ProductGroup>(); // Empty list ensures the correct feedback is shown.
+        }
+        catch (Exception ex)
+        {
+            ErrorHandler.HandleException(ex);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    public async Task SubmitChanges()
+    {
+        isLoading = true;
+
+        // Get the active user id.
+        var user = (await authenticationStateTask).User;
+        var userIdClaim = user.Claims.Where(c => c.Type == "oid").FirstOrDefault();
+
+        // Get all product order values.
+        var orderDetails = new List<UpdatePlanRequestDetail>();
+
+        foreach (var group in PlanGroups)
+        {
+            foreach (var product in group.Products)
+            {
+                UpdatePlanRequestDetail detail = new UpdatePlanRequestDetail { itemId = product.Id, productCode = product.Code.Value.ToString() };
+                detail.orderQuantities.AddRange(product.DailyOrderQuantities.Select(q => q.Cases.HasValue ? q.Cases.Value : 0).ToList());
+                orderDetails.Add(detail);
+            }
+        }
+
+        try
+        {
+            // Build the update request object
+            if (ViewType == UserViewType.Master)
+            {
+                // Update the master plan.
+                UpdateMasterPlanRequest request = new UpdateMasterPlanRequest()
+                {
+                    locationId = this.locationId,
+                    userId = userIdClaim?.Value,
+                    weekNo = this.weekNo,
+                    details = orderDetails
+                };
+
+                await productService.UpdateMasterPlan(request);
+            }
+            else
+            {
+                // Get the correct order date, must be the Monday of the relevant week.
+                DateTime orderDate = DateTime.Now.StartOfWeek(DayOfWeek.Monday);
+
+                if (this.weekNo == 2)
+                    orderDate = orderDate.AddDays(7); // Next week
+
+                // Update the weekly plan.
+                UpdateWeeklyPlanRequest request = new UpdateWeeklyPlanRequest
+                {
+                    locationId = this.locationId,
+                    userId = userIdClaim?.Value,
+                    orderDate = orderDate.Date.ToString(),
+                    details = orderDetails
+                };
+
+                await productService.UpdateWeeklyPlan(request);
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorHandler.HandleException(ex);
+        }
+        finally
+        {
+            isLoading = false;
+            await LoadPlan(locationId, departmentId, subclassId, weekNo);
+        }
+    }
+
+    public async Task Reset()
+    {
+        // Reload the current plan without changes
+        await LoadPlan(locationId, departmentId, subclassId, weekNo);
+    }
+
+    private async void CheckChanged(string elementId,ChangeEventArgs eventArgs)
+    {       
+        int orders = Int32.Parse(eventArgs.Value.ToString());
+        var message = $"You have entered {orders} lugs/cases. Please confirm that this quantity is correct?";
+        if (orders >= 10)
+        {
+            await ModalShow(message, elementId);   
+        }
+        else
+        {
+            await ChangeBackgroundColor(elementId);
+
+        }
+    }
+
+    async Task ChangeBackgroundColor(string id)
+    {
+        await JSRuntime.InvokeVoidAsync("applyStyleForElement",new { id = id, attrib = "background-color", value = "#aaffaa" });
+    }
+
+    async Task GoBackToElement(string id)
+    {
+        await JSRuntime.InvokeVoidAsync("goBack",new { id = id});
+    }
+    async Task StopTab()
+    {
+        await JSRuntime.InvokeVoidAsync("stopTab");
+    }
+    async Task ResumeTab()
+    {
+        await JSRuntime.InvokeVoidAsync("resumeTab");
+    }
+
+    decimal GetDepartmentDailyTotal(int dayIndex)
+    {
+        decimal total = 0.0M;
+
+        foreach (var group in PlanGroups)
+            total += group.DailyOrderTotal(dayIndex);
+
+        return total;
+    }
+
+    decimal? CalGroupTotal(int cases, decimal? sellingPrice)
+    {
+        grouptotal += cases * (decimal)sellingPrice;
+        return grouptotal;
+    }
+
+    bool showModal = false;
+    bool showSecondModal = false;
+    string content = string.Empty;
+    string inputIdentifier = string.Empty;
+
+    private List<ProductGroup> FirstLoadPlanGroups { get; set; }
+    private List<ProductGroup> FirstLoadAllPlanGroups { get; set; }
+
+    async Task ModalShow(string message,string id) {
+        content = message;
+        inputIdentifier = id;
+        showModal = true;
+
+        await StopTab();//stop users from tabbing
+    }
+
+    async Task SecondModalShow(string message,string id) {
+        content = message;
+        inputIdentifier = id;
+        showSecondModal = true;        
+    }
+    async void ModalCancel() 
+    {
+        var itemId = inputIdentifier;
+        var lst = Convert.ToInt32(itemId.Substring(itemId.Length - 1));
+        var previousValue = PreChange();//get the default value 
+
+        foreach (var item in PlanGroups)
+        {
+            for (int i = 0; i < item.Products.Count; i++)
+            {
+                if(item.Products[i].Id == itemId.Remove(itemId.Length-1))
+                {  
+                    item.Products[i].DailyOrderQuantities[lst-1].Cases = previousValue;
+                }
+            }
+        }
+
+        showModal = false;
+        showSecondModal = false;
+
+        await GoBackToElement(inputIdentifier);
+
+        await ResumeTab();//resume users from tabbing
+    }
+    async void ModalConfirm()
+    {
+        showModal = false;
+
+        if (showSecondModal == true)
+        {
+            showSecondModal = false;
+
+            await ChangeBackgroundColor(inputIdentifier);
+            
+            await GoBackToElement(inputIdentifier);
+            
+            await ResumeTab();//resume users from tabbing
+        }
+        else
+            await SecondModalShow("Are you sure?", inputIdentifier);
+
+    }
+    void WeekCounterClear()
+    {
+        weekCounter = 0;
+    }
+    int WeekCounter()
+    {
+        return ++weekCounter;
+    }
+    async Task GetPlan()
+    {   
+        try
+        {
+            if (ViewType == UserViewType.Master)
+                FirstLoadAllPlanGroups = await productService.GetMasterPlan(locationId, departmentId, 0, weekNo);
+            else
+                FirstLoadAllPlanGroups = await productService.GetWeeklyPlan(locationId, departmentId, 0, weekNo);
+
+            if (subclassId != 0)
+                FirstLoadPlanGroups = FirstLoadAllPlanGroups.Where(g => g.Id == subclassId).ToList();
+            else
+                FirstLoadPlanGroups = FirstLoadAllPlanGroups; 
+
+            if (FirstLoadPlanGroups is null)
+                FirstLoadPlanGroups = new List<ProductGroup>(); // Empty list ensures the correct feedback is shown.
+        }
+        catch (Exception ex)
+        {
+            ErrorHandler.HandleException(ex);
+        }
+    }
+    int? PreChange()
+    {
+        var itemId = inputIdentifier;
+        var lst = Convert.ToInt32(itemId.Substring(itemId.Length - 1));
+        int? previousValue = 0;
+
+        foreach (var item in FirstLoadPlanGroups)
+        {
+            for (int i = 0; i < item.Products.Count; i++)
+            {
+                if(item.Products[i].Id == itemId.Remove(itemId.Length-1))
+                {
+                    previousValue = item.Products[i].DailyOrderQuantities[lst - 1].Cases;
+                }
+            }
+        }
+
+        return previousValue;
+    }
+
+}

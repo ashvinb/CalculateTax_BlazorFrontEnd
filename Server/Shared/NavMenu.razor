@@ -1,0 +1,116 @@
+﻿@using Microsoft.AspNetCore.Components.WebAssembly.Hosting
+
+@inject IWebAssemblyHostEnvironment HostEnvironment
+
+<div class="top-row app-title pl-4 navbar navbar-dark">
+    <a class="navbar-brand app-title-text" href="">
+        <img src="/css/images/ww_logo_black.png" alt="" width="24" height="24">
+        Food ISO @Environment
+    </a>
+    <button class="navbar-toggler" @onclick="ToggleNavMenu">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+</div>
+
+<div class="@NavMenuCssClass" @onclick="ToggleNavMenu">
+    <ul class="nav flex-column">
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="oi oi-home" aria-hidden="true"></span> Home
+            </NavLink>
+        </li>
+
+        <AuthorizeView Policy="@(Constants.PolicyNames.Planner)">
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="weeklyplan">
+                    <span aria-hidden="true"></span> Weekly Plan
+                </NavLink>
+            </li>
+        </AuthorizeView>
+
+        <AuthorizeView Policy="@(Constants.PolicyNames.SmallWeeklyPlanViewer)">
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="smallweeklyplan">
+                    <span aria-hidden="true"></span> Weekly Plan - Small View
+                </NavLink>
+            </li>
+        </AuthorizeView>
+
+        <AuthorizeView Policy="@(Constants.PolicyNames.Planner)">
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="masterplan">
+                    <span aria-hidden="true"></span> Master Plan
+                </NavLink>
+            </li>
+        </AuthorizeView>
+
+        <AuthorizeView Policy="@(Constants.PolicyNames.ReportViewer)">
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="orderreport">
+                    <span aria-hidden="true"></span> Order Report
+                </NavLink>
+            </li>
+        </AuthorizeView>
+
+        <AuthorizeView Policy="@(Constants.PolicyNames.AuditViewer)">
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="audittracking">
+                    <span aria-hidden="true"></span> Audit Tracking
+                </NavLink>
+            </li>
+        </AuthorizeView>
+
+        <AuthorizeView Policy="@(Constants.PolicyNames.UserAdministrator)">
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="useradmin">
+                    <span aria-hidden="true"></span> User Administration
+                </NavLink>
+            </li>
+        </AuthorizeView>
+        <AuthorizeView Policy="@(Constants.PolicyNames.storeCutoverAdministrator)">
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="storecutoveradmin">
+                    <span aria-hidden="true"></span> Cutover Administration
+                </NavLink>
+            </li>
+        </AuthorizeView>
+
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="productcatalogue">
+                    <span aria-hidden="true"></span> Product Catalogue
+                </NavLink>
+        </li>
+            
+    </ul>
+</div>
+
+@code {
+    private bool collapseNavMenu = true;
+    
+    private string NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    private string Environment
+    {
+        get
+        {
+            var env = HostEnvironment.Environment.ToLowerInvariant() switch
+            {
+                "development" => "Dev",
+                "dev" => "Dev",
+                "qa" => "QA",
+                "staging" => "QA",
+                _ => string.Empty
+            };
+
+            if (!string.IsNullOrEmpty(env))
+                return $"({env})";
+
+            return string.Empty;
+        }
+    }
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+}

@@ -1,0 +1,80 @@
+﻿@using Woolworths.FoodISO.WebClient.Infrastructure
+
+<nav aria-label="Table navigation">
+    <ul class="pagination justify-content-center">
+        @foreach (var link in links)
+        {
+            <li @onclick="() => OnSelectedPage(link)" style="cursor: pointer;@( link.Text != link.Page.ToString() ? "" : "width: 40px; text-align: center;")" class="page-item @(link.Enabled ? null : "disabled") @(link.Active ? "active" : null)">
+                <span class="page-link" href="#">@link.Text</span>
+            </li>
+        }
+    </ul>
+</nav>
+
+@code {
+    [Parameter]
+    public PagingMetadata Metadata { get; set; }
+
+    [Parameter]
+    public int Spread { get; set; }
+
+    [Parameter]
+    public EventCallback<int> SelectedPage { get; set; }
+
+    private List<PagingLink> links;
+    int range { get { return (int)(Spread / 2); } }
+
+    protected override void OnParametersSet()
+    {
+        CreatePagingLinks();
+    }
+
+    private void CreatePagingLinks()
+    {
+        int startPage = 1;
+        int endPage = Metadata.TotalPages;
+
+        if (Spread != 0 && (endPage - startPage) > Spread)
+        {
+            var range = (int)(Spread / 2);
+
+            if (Metadata.CurrentPage < range)
+            {
+                startPage = 1;
+                endPage = Spread + 1;
+            }
+            else if (Metadata.CurrentPage > (Metadata.TotalPages - range))
+            {
+                startPage = (Metadata.TotalPages) - (Spread + 1);
+                endPage = Metadata.TotalPages;
+            }
+            else
+            {
+                startPage = Math.Clamp(Metadata.CurrentPage - range, 1, Metadata.TotalPages);
+                endPage = Math.Clamp(Metadata.CurrentPage + range, 1, Metadata.TotalPages);
+            }
+        }
+
+        links = new List<PagingLink>();
+
+        links.Add(new PagingLink(Metadata.CurrentPage - 1, Metadata.HasPrevious, "Prev"));
+
+        for (int i = startPage; i <= endPage; i++)
+            links.Add(new PagingLink(i, true, i.ToString()) { Active = Metadata.CurrentPage == i });
+
+        links.Add(new PagingLink(Metadata.CurrentPage + 1, Metadata.HasNext, "Next"));
+    }
+
+    private async Task OnSelectedPage(PagingLink link)
+    {
+        if (link.Page == Metadata.CurrentPage || !link.Enabled)
+            return;
+
+        Metadata.CurrentPage = link.Page;
+
+        if (link.Page == links.Min(l => l.Page) || link.Page == links.Max(l => l.Page))
+            CreatePagingLinks();
+
+        await SelectedPage.InvokeAsync(link.Page);
+    }
+}

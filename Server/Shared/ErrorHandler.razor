@@ -1,0 +1,28 @@
+﻿@using Microsoft.Extensions.Logging
+@using Microsoft.AspNetCore.Components.WebAssembly.Hosting
+@using Blazored.Toast.Services;
+
+@inject ILogger<ErrorHandler> _logger
+@inject IWebAssemblyHostEnvironment _env
+@inject IToastService _toastService
+
+<CascadingValue Value="this">
+    @ChildContent
+</CascadingValue>
+
+@code{
+
+    [Parameter]
+    public RenderFragment ChildContent { get; set; }
+
+    public void HandleException(Exception ex)
+    {
+        _logger.LogError(ex, ex.Message);
+
+        if (_env.IsDevelopment())
+            _toastService.ShowError(ex.Message);
+        else
+            _toastService.ShowError("Oops! Something has gone wrong! If the problem persists, please contact the Woolworths Support Desk on 021 407 3535 for assistance.");
+    }
+
+}

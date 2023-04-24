@@ -1,0 +1,72 @@
+﻿@using Woolworths.FoodISO.Services
+@using Woolworths.FoodISO.Services.Models
+
+<table class="legend">
+    <tbody>
+        @foreach (var legend in legend)
+        {
+            <tr>
+                <td class="legend-colour-tag" style="background-color:@(legend.Colour); width:10px;"></td>
+                <td>
+                    @legend.Value
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code{
+
+    private List<LegendEntry> legend { get; set; }
+
+    public enum UserViewType
+    {
+        Master,
+        Weekly,
+        WeeklySmall
+    }
+
+    [Parameter]
+    public UserViewType ViewType { get; set; } = UserViewType.Weekly;
+
+    protected override async Task OnInitializedAsync()
+    {
+        legend = new List<LegendEntry>();
+
+        // Core entries in every version of the legend
+        legend.Add(new LegendEntry { Id = 1, Value = "Non Delivery Day", Colour = "#ffcc00" });
+        legend.Add(new LegendEntry { Id = 2, Value = "Value / Qty Changed", Colour = "#aaffaa" });
+
+        switch (ViewType)
+        {
+            case UserViewType.Master:
+                {
+                    legend.Add(new LegendEntry { Id = 4, Value = "Items in 'Temporary unavailable' status", Colour = "#ffb0b0" });
+                    legend.Add(new LegendEntry { Id = 3, Value = "Case Units differ from Wk1 to Wk2", Colour = "#9ff5ef" });
+                    break;
+                }
+            case UserViewType.Weekly:
+                {
+                    legend.Insert(0, new LegendEntry { Id = 1, Value = "Lead Time Elapsed", Colour = "yellow" });
+                    legend.Add(new LegendEntry { Id = 4, Value = "Items in 'Temporary unavailable' status", Colour = "#ffb0b0" });
+                    legend.Add(new LegendEntry { Id = 5, Value = "Case Units differ from Wk1 to Wk2", Colour = "#9ff5ef" });
+                    break;
+                }
+            case UserViewType.WeeklySmall:
+                {
+                    legend.Insert(0, new LegendEntry { Id = 1, Value = "Lead Time Elapsed", Colour = "#ffff33" });
+                    break;
+                }
+        }
+
+        await base.OnInitializedAsync();
+    }
+
+    private class LegendEntry
+    {
+        public int Id { get; set; }
+        public string Value { get; set; }
+        public string Colour { get; set; }
+    }
+}
+

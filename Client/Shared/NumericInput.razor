@@ -1,0 +1,93 @@
+﻿@inherits InputBase<int>
+
+<input @attributes="AdditionalAttributes" @oninput="OnInput" @bind-value="@CurrentValueAsString" />
+
+@code {
+    private string _currentValueAsString;
+
+    private string CurrentValueAsString
+    {
+        get => _currentValueAsString;
+        set
+        {
+            _currentValueAsString = value;
+            if (int.TryParse(value, out int numericValue))
+            {
+                CurrentValue = numericValue;
+                ValueChanged.InvokeAsync(numericValue);
+            }
+        }
+    }
+
+    private void OnInput(ChangeEventArgs e)
+    {
+        var inputValue = e.Value.ToString();
+        var numericValue = new string(inputValue.Where(c => char.IsDigit(c)).ToArray());
+        _currentValueAsString = numericValue;
+        if (int.TryParse(numericValue, out int parsedValue))
+        {
+            CurrentValue = parsedValue;
+            ValueChanged.InvokeAsync(parsedValue);
+        }
+    }
+
+    protected override bool TryParseValueFromString(string? value, out int result, out string? validationErrorMessage)
+    {
+        if (int.TryParse(value, out result))
+        {
+            validationErrorMessage = null;
+            return true;
+        }
+        else
+        {
+            validationErrorMessage = "The input must be a valid integer.";
+            return false;
+        }
+    }
+}
+
+@*@inherits InputBase<int>
+
+<input @attributes="AdditionalAttributes" @oninput="OnInput" @bind-value="@CurrentValueAsString" />
+
+@code {
+    private string _currentValueAsString;
+
+    private string CurrentValueAsString
+    {
+        get => _currentValueAsString;
+        set
+        {
+            _currentValueAsString = value;
+            if (int.TryParse(value, out int numericValue))
+            {
+                CurrentValue = numericValue;
+            }
+        }
+    }
+
+    private void OnInput(ChangeEventArgs e)
+    {
+        var inputValue = e.Value.ToString();
+        var numericValue = new string(inputValue.Where(c => char.IsDigit(c)).ToArray());
+        _currentValueAsString = numericValue;
+        if (int.TryParse(numericValue, out int parsedValue))
+        {
+            CurrentValue = parsedValue;
+        }
+    }
+
+    protected override bool TryParseValueFromString(string? value, out int result, out string? validationErrorMessage)
+    {
+        if (int.TryParse(value, out result))
+        {
+            validationErrorMessage = null;
+            return true;
+        }
+        else
+        {
+            validationErrorMessage = "The input must be a valid integer.";
+            return false;
+        }
+    }
+}*@

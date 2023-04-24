@@ -1,0 +1,72 @@
+﻿@using Woolworths.FoodISO.Services
+@using Woolworths.FoodISO.Services.Models
+
+@inject IMasterDataService masterDataService
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col">@($"Date: {DateTime.Now.ToString("dd MMMM yyyy HH:mm:ss")}")</div>
+    </div>
+    <div class="row">
+        <div class="col">
+            <span>@($"Region: {RegionName}")</span>
+        </div>
+    </div>
+</div>
+
+@code {
+    private int CurrentLocationId = 0;
+    private string RegionName { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; }
+
+    [CascadingParameter]
+    private ErrorHandler ErrorHandler { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Grab the current user and check for the default store
+            var user = (await authenticationStateTask).User;
+
+            var defaultStore = Convert.ToInt32(user.Claims.Where(c => c.Type == Constants.CustomClaimNames.DefaultStore).Select(c => c.Value).SingleOrDefault());
+
+            await UpdateRegion(defaultStore);
+
+            await base.OnInitializedAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorHandler.HandleException(ex);
+        }
+    }
+
+    
+    public async Task UpdateRegion(int locationId)
+    {
+        try
+        {
+            if (CurrentLocationId == locationId)
+                return; // Avoid repeated, unneccessary calls to the APIs.
+
+            CurrentLocationId = locationId;
+            RegionName = "Please wait...";
+
+            var region = await masterDataService.GetRegion(locationId);
+
+            if (region != null)
+                RegionName = region.planningRegion.description.Trim();
+            else
+                RegionName = "Unknown";
+
+            StateHasChanged();
+
+        }
+        catch (Exception ex)
+        {
+            ErrorHandler.HandleException(ex);
+        }
+    }
+}
